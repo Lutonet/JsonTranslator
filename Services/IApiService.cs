@@ -6,6 +6,6 @@ namespace JsonTranslator.Services
     {
         Task<List<Language>> GetLanguages();
 
-        Task<List<TranslationBulk>> Translate(List<Translation> phrases, string sourceLanguage);
+        Task<List<TranslationBulk>> Translate(List<Translation> phrases);
     }
 }
