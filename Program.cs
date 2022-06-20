@@ -1,4 +1,5 @@
 using JsonTranslator;
+using JsonTranslator.Services;
 using Serilog;
 using Serilog.Events;
 
@@ -12,6 +13,9 @@ Log.Logger = new LoggerConfiguration()
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
     {
+        services.AddSingleton<IFileService, FileService>();
+        services.AddSingleton<IFtpService, FtpService>();
+        services.AddSingleton<IApiService, ApiService>();
         services.AddHostedService<Worker>();
     })
     .Build();
