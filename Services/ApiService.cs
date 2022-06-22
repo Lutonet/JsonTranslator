@@ -37,12 +37,6 @@ namespace JsonTranslator.Services
                     settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
                 }
                 servers = settings.Servers;
-                foreach (var server in servers)
-                {
-                    HttpClient client = new HttpClient();
-                    client.BaseAddress = new Uri(server.Address);
-                    apiServers.Add(client);
-                }
             }
         }
 

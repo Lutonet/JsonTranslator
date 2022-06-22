@@ -19,8 +19,8 @@ namespace JsonTranslator.Services
         public bool Finished { get; set; } = false;
 
         public List<Translation> buffer = new List<Translation>();
-        public List<Translation> successfullTranslations { get; set; }
-        public List<Translation> unsuccessfullTranslations { get; set; }
+        public List<Translation> successfullTranslations { get; set; } = new List<Translation>();
+        public List<Translation> unsuccessfullTranslations { get; set; } = new List<Translation>();
         public List<Language> languagesToTranslate { get; set; }
         public string DefaultLanguage { get; set; }
 
@@ -53,10 +53,61 @@ namespace JsonTranslator.Services
                     }
                 }
 
-                //
+                // Cycle to check the buffer
                 while (buffer.Count == 0)
                 {
-                    Task.Delay(50).Wait();
+                    Task.Delay(20).Wait();
+                }
+
+                // buffer is not empty - let proceed
+                foreach (Translation line in buffer)
+                {
+                    TranslationRequestModel request = new();
+                    request.q = line.Text;
+                    request.source = DefaultLanguage;
+                    request.target = line.Language;
+                    request.api_key = String.Empty;
+                    if (server.UseKey)
+                    {
+                        request.api_key = server.Key;
+                    }
+                    ApiResult translationResult = await TranslatePhrase(request);
+                    if (translationResult.IsError)
+                    {
+                        unsuccessfullTranslations.Add(line);
+                        buffer.Remove(line);
+
+                        //TODO translate all phrases
+                    }
+                    else
+                    {
+                        Translation successful = new Translation();
+                        successful.Text = translationResult.Translation;
+                        if (successful.Text == line.Text)
+                        {
+                            request.q = (request.q).ToLower();
+                            translationResult = await TranslatePhrase(request);
+                            if (!translationResult.IsError)
+                            {
+                                successfullTranslations.Add(new Translation()
+                                {
+                                    Phrase = line.Phrase,
+                                    Text = translationResult.Translation,
+                                    Language = line.Language
+                                });
+                            }
+                        }
+                        else
+                        {
+                            successfullTranslations.Add(new Translation()
+                            {
+                                Phrase = line.Phrase,
+                                Text = translationResult.Translation,
+                                Language = line.Language
+                            });
+                        }
+                    }
+                    // Buffer is empty let run another cycle
                 }
             }
         }
@@ -95,12 +146,23 @@ namespace JsonTranslator.Services
             {
                 try
                 {
-                    ApiTranslateResponse response = await result.Content.ReadFromJsonAsync<ApiTranslateResponse>();
-                    return new ApiResult()
+                    ApiTranslateResponse response = await result.Content.ReadFromJsonAsync<ApiTranslateResponse>();              // TODO - check if translation is correct => repeat in case of failure with uncapitalized letters
+                    if (response != null)
                     {
-                        IsError = false,
-                        Translation = response.translatedText
-                    };
+                        return new ApiResult()
+                        {
+                            IsError = false,
+                            Translation = response.translatedText
+                        };
+                    }
+                    else
+                    {
+                        return new ApiResult()
+                        {
+                            IsError = true,
+                            Translation = String.Empty
+                        };
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -113,7 +175,8 @@ namespace JsonTranslator.Services
             }
             return new ApiResult()
             {
-                IsError = true
+                IsError = true,
+                Translation = result.StatusCode.ToString()
             };
         }
     }
