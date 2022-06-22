@@ -1,89 +1,64 @@
 ﻿using JsonTranslator.Models;
 using System;
+using System.Configuration;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using System.Threading;
 
 namespace JsonTranslator.Services
 {
     public class ApiService : IApiService
     {
-        public readonly IConfiguration _configuration;
-        public readonly ServiceSettings settings;
-        public static List<Servers> servers;
+        public IConfiguration _configuration;
+        public ServiceSettings settings;
+        public static Servers[] servers;
         public static List<Translation> workload = new List<Translation>();
         public List<TranslationBulk> result = new List<TranslationBulk>();
         public static List<HttpClient> apiServers = new List<HttpClient>();
+        private ILogger<ApiService> _logger;
 
-        public ApiService(IConfiguration configuration)
+        public ApiService(IConfiguration configuration, ILogger<ApiService> logger)
         {
-            settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
-            servers = settings.Servers;
+            _configuration = configuration;
+            _logger = logger;
+        }
+
+        public void Init()
+        {
+            if (settings == null)
+            {
+                while (settings == null)
+                {
+                    _logger.LogWarning("Settings not found, waiting 1s to retry");
+                    Task.Delay(1000).Wait();
+                    settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
+                }
+                servers = settings.Servers;
+                foreach (var server in servers)
+                {
+                    HttpClient client = new HttpClient();
+                    client.BaseAddress = new Uri(server.Address);
+                    apiServers.Add(client);
+                }
+            }
         }
 
         // most important class here
-        public async Task<List<TranslationBulk>> Translate(List<Translation> phrases)
+        public async Task<List<TranslationBulk>> Translate(List<Translation> phrases, CancellationToken token)
         {
+            Init();
             // copy phrases to the local list
             foreach (var phrase in phrases)
             {
                 workload.Add(phrase);
             }
             // create API instances and buffers
-            foreach (var server in servers)
-            {
-                // create worker and add it to the list
-            }
+
+            // create worker and add it to the list
             return new List<TranslationBulk>();
-        }
-
-        public class BufferService
-        {
-            private readonly HttpClient client;
-            private readonly int size;
-            private bool bufferError = true;
-
-            public BufferService(int id, int size = 5)
-            {
-                client = apiServers[id];
-                client.BaseAddress = new Uri(servers[id].Address);
-                this.size = size;
-            }
-
-            public async Task Start()
-            {
-                List<Translation> buffer = new List<Translation>();
-
-                // Initialize and start buffer work
-                while (workload.Count > 0)
-                {
-                    // Test server before start and after each
-                    if (bufferError)
-                    {
-                    }
-
-                    if (buffer.Count == 0)
-                    {
-                        // get the next batch of phrases
-                        try
-                        {
-                            buffer = workload.Take(size).ToList();
-                        }
-                        catch
-                        {
-                            try
-                            {
-                                buffer = workload.Take(1).ToList();
-                            }
-                            catch { };
-                        }
-
-                        workload.RemoveRange(0, buffer.Count);
-                    }
-                    // work through the buffer
-                }
-            }
         }
 
         // worker should include buffer and be able to call "fill buffer from shared list - elements moved to the buffer from the list
@@ -92,37 +67,15 @@ namespace JsonTranslator.Services
             return await GetLanguages(apiServers[0]);
         }
 
-        public async Task<(string, bool)> TranslatePhrase(string phrase, string targetLanguage, string sourceLanguage, HttpClient client)
-        {
-            List<Language> languages = await GetLanguages();
-            Servers server = servers.Where(s => s.Address == client.BaseAddress.ToString()).FirstOrDefault();
-            if (server == null)
-                throw new Exception("server error");
-            else
-            {
-                if (phrase == null
-                    || targetLanguage == null
-                    || sourceLanguage == null
-                    || client== null
-                    || phrase == string.Empty)
-                    return ("Missing input", false);
-                if (!languages.Any(s => s.Code == sourceLanguage))
-                    return ("Source language doesn't exist", false);
-                if (!languages.Any(s => s.Code == targetLanguage))
-                    return ("Target language doesn't exist", false);
-
-                // all seems OK let get translation
-                return ("", true);
-            }
-        }
-
         public async Task<List<Language>> GetLanguages(HttpClient client)
         {
+            Init();
             return new List<Language>();
         }
 
         public async Task<ServerTestResult> TestServer(HttpClient client)
         {
+            Init();
             return new ServerTestResult();
         }
     }

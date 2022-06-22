@@ -8,10 +8,10 @@ namespace JsonTranslator.Models
 {
     public class ServiceSettings
     {
-        public List<Servers> Servers { get; }
-        public List<string> Folders { get; }
-        public List<FTP> FTP { get; }
-        public string DefaultLanguage { get; }
-        public List<string> IgnoreLanguages { get; }
+        public Servers[] Servers { get; set; }
+        public string [] Folders { get; set; }
+        public FTP [] FTPs { get; set; }
+        public string DefaultLanguage { get; set; }
+        public string [] IgnoreLanguages { get; set; }
     }
 }

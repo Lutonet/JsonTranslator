@@ -9,7 +9,7 @@ namespace JsonTranslator.Models
     public class Servers
     {
         public string Address { get; set; }
-        public string Key { get; set; } = "";
         public bool UseKey { get; set; } = false;
+        public string Key { get; set; } = "";
     }
 }

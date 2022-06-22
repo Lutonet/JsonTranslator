@@ -9,7 +9,7 @@ namespace JsonTranslator.Models
     public class FTP
     {
         public string Server { get; set; }
-        public string[] Folder { get; set; }
+        public List<string> Folder { get; set; }
         public string Login { get; set; }
         public string Password { get; set; }
     }

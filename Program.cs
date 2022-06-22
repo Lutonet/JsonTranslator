@@ -13,10 +13,10 @@ Log.Logger = new LoggerConfiguration()
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
     {
+        services.AddHostedService<Worker>();
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IFtpService, FtpService>();
         services.AddSingleton<IApiService, ApiService>();
-        services.AddHostedService<Worker>();
     })
     .Build();
 

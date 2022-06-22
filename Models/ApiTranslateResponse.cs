@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 
 namespace JsonTranslator.Models
 {
-    public class ServerTestResult
+    public class ApiTranslateResponse
     {
-        public bool Success { get; set; }
-        public string Message { get; set; }
-        public int ResponseTime { get; set; }
+        public string translatedText { get; set; }
     }
 }

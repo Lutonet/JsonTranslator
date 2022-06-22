@@ -1,5 +1,6 @@
 using JsonTranslator.Models;
 using JsonTranslator.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace JsonTranslator
 {
@@ -9,7 +10,7 @@ namespace JsonTranslator
         private readonly IConfiguration _configuration;
         private readonly IApiService _api;
         private readonly IFileService _file;
-        private ServiceSettings settings;
+        public ServiceSettings settings;
         private List<HttpClient> clients;
         private List<Language> allLanguages;
         private List<Language> languagesForTranslation;
@@ -39,11 +40,11 @@ namespace JsonTranslator
         {
             _logger.LogInformation("Loading program settings...");
             // load Settings
-            while (!cancellationToken.IsCancellationRequested && settings == null)
+            while (!cancellationToken.IsCancellationRequested && settings == null || settings.DefaultLanguage == null)
             {
                 _logger.LogWarning("Settings not found, waiting 1s to retry");
-                Task.Delay(1000, cancellationToken).Wait();
                 settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
+                Task.Delay(500, cancellationToken).Wait();
             }
             Console.WriteLine("Settings Loaded");
             defaultLanguage = settings.DefaultLanguage;
@@ -60,13 +61,13 @@ namespace JsonTranslator
                         folders.Add(folder);
                     }
                 }
-                Task.Delay(1000).Wait();
+                Task.Delay(500).Wait();
             }
 
             // Check FTP
 
             // Check API
-            List<Servers> servers = settings.Servers;
+            Servers[] servers = settings.Servers;
             foreach (Servers server in servers)
             {
                 HttpClient client = new HttpClient();
