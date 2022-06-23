@@ -75,17 +75,43 @@ namespace JsonTranslator.Services
                         if (service.buffer.Count == 0)
                         {
                             if (workload.Count > service.Size)
+                            {
                                 service.buffer.AddRange(workload.Take(service.Size));
-                            workload.RemoveRange(0, service.Size);
+                                workload.RemoveRange(0, service.Size);
+                            }
+                            else
+                            {
+                                service.buffer.Add(workload.FirstOrDefault());
+                                workload.Remove(workload.FirstOrDefault());
+                            }
+
                             if (service.successfullTranslations.Any())
                             {
+                                translated.AddRange(service.successfullTranslations);
+                                service.successfullTranslations.Clear();
+                            }
+                            if (service.unsuccessfullTranslations.Any())
+                            {
+                                errors.AddRange(service.unsuccessfullTranslations);
+                                service.unsuccessfullTranslations.Clear();
                             }
                         }
                     }
+                    await Task.Delay(100);
                 }
-                await Task.Delay(50);
+                foreach (BufferService service in buffers)
+                {
+                    if (service.buffer.Count == 0 && !service.successfullTranslations.Any() && !service.unsuccessfullTranslations.Any())
+                    {
+                        completedBuffers++;
+                        service.Finished = true;
+                        completedBuffers++;
+                    }
+                }
+                Task.WaitAll(bufferTasks.ToArray());
+                // create worker and add it to the list
+                Console.WriteLine($"{translated.Count} phrases translated");
             }
-            // create worker and add it to the list
             return new List<TranslationBulk>();
         }
 
