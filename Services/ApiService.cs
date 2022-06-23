@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using System.Threading;
+using System.Net.Http.Json;
 
 namespace JsonTranslator.Services
 {
@@ -16,9 +17,14 @@ namespace JsonTranslator.Services
         public ServiceSettings settings;
         public static Servers[] servers;
         public static List<Translation> workload = new List<Translation>();
+        public static List<Translation> translated = new List<Translation>();
+        public static List<Translation> errors = new List<Translation>();
         public List<TranslationBulk> result = new List<TranslationBulk>();
         public static List<HttpClient> apiServers = new List<HttpClient>();
         private ILogger<ApiService> _logger;
+        public List<BufferService> buffers = new List<BufferService>();
+        public bool Completed = false;
+        public List<Task> bufferTasks;
 
         public ApiService(IConfiguration configuration, ILogger<ApiService> logger)
         {
@@ -50,7 +56,35 @@ namespace JsonTranslator.Services
                 workload.Add(phrase);
             }
             // create API instances and buffers
-
+            for (int i = 0; i < servers.Count(); i++)
+            {
+                buffers.Add(new BufferService(servers[i], 5));
+            }
+            int completedBuffers = 0;
+            int temp = 0;
+            foreach (BufferService buffer in buffers)
+            {
+                Task bufferTask = new Task(async () => await buffer.Start());
+            }
+            while (!Completed && !token.IsCancellationRequested)
+            {
+                if (workload.Count > 0)
+                {
+                    foreach (BufferService service in buffers)
+                    {
+                        if (service.buffer.Count == 0)
+                        {
+                            if (workload.Count > service.Size)
+                                service.buffer.AddRange(workload.Take(service.Size));
+                            workload.RemoveRange(0, service.Size);
+                            if (service.successfullTranslations.Any())
+                            {
+                            }
+                        }
+                    }
+                }
+                await Task.Delay(50);
+            }
             // create worker and add it to the list
             return new List<TranslationBulk>();
         }
@@ -58,12 +92,31 @@ namespace JsonTranslator.Services
         // worker should include buffer and be able to call "fill buffer from shared list - elements moved to the buffer from the list
         public async Task<List<Language>> GetLanguages()
         {
-            return await GetLanguages(apiServers[0]);
-        }
-
-        public async Task<List<Language>> GetLanguages(HttpClient client)
-        {
             Init();
+
+            try
+            {
+                using HttpClient client = new HttpClient();
+                client.BaseAddress = new Uri(servers[0].Address);
+                var response = await client.GetFromJsonAsync<List<Language>>("/languages");
+                if (response != null)
+                    return response;
+            }
+            catch
+            {
+                try
+                {
+                    using HttpClient client = new HttpClient();
+                    client.BaseAddress = new Uri(servers[1].Address);
+                    var response = await client.GetFromJsonAsync<List<Language>>("/languages");
+                    if (response != null)
+                        return response;
+                }
+                catch
+                {
+                    return new List<Language>();
+                }
+            }
             return new List<Language>();
         }
 

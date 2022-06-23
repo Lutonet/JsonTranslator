@@ -17,6 +17,7 @@ namespace JsonTranslator.Services
         private HttpClient client;
         public bool IsError { get; set; } = false;
         public bool Finished { get; set; } = false;
+        public int Size { get; set; } = 5;
 
         public List<Translation> buffer = new List<Translation>();
         public List<Translation> successfullTranslations { get; set; } = new List<Translation>();
@@ -24,7 +25,7 @@ namespace JsonTranslator.Services
         public List<Language> languagesToTranslate { get; set; }
         public string DefaultLanguage { get; set; }
 
-        public BufferService(Servers server, int size = 5, IConfiguration configuration = null, ILogger<BufferService> logger = null)
+        public BufferService(Servers server, int Size = 5, IConfiguration configuration = null, ILogger<BufferService> logger = null)
         {
             _configuration = configuration;
             ServiceSettings settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
@@ -33,6 +34,7 @@ namespace JsonTranslator.Services
             client.BaseAddress = new Uri(server.Address);
             this.server = server;
             _logger = logger;
+            this.Size = Size;
         }
 
         public async Task Start()
