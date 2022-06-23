@@ -97,7 +97,6 @@ namespace JsonTranslator.Services
                             }
                         }
                     }
-                    await Task.Delay(100);
                 }
                 foreach (BufferService service in buffers)
                 {
@@ -108,9 +107,37 @@ namespace JsonTranslator.Services
                         completedBuffers++;
                     }
                 }
-                Task.WaitAll(bufferTasks.ToArray());
                 // create worker and add it to the list
-                Console.WriteLine($"{translated.Count} phrases translated");
+            }
+            Task.WaitAll(bufferTasks.ToArray());
+            await Task.Delay(100);
+            Console.WriteLine($"{translated.Count} phrases translated");
+            translated = translated.OrderBy(s => s.Language).ToList();
+            string[] countries = translated.Select(s => s.Language).Distinct().ToArray();
+            List<TranslationBulk> translations = new();
+            if (countries != null && countries.Length > 0)
+            {
+                foreach (string country in countries)
+                {
+                    List<Translation> localized = translated.Where(s => s.Language == country).ToList();
+                    if (localized == null || localized.Count == 0)
+                    {
+                        translations.Add(new TranslationBulk() { LanguageId = country, Dictionary = new Dictionary<string, string>() });
+                    }
+                    else
+                    {
+                        TranslationBulk bulk = new TranslationBulk();
+                        bulk.LanguageId = country;
+                        Dictionary<string, string> result = new Dictionary<string, string>();
+                        foreach (Translation line in localized)
+                        {
+                            result.Add(line.Phrase, line.Text);
+                        }
+                        bulk.Dictionary = result;
+                        translations.Add(bulk);
+                    }
+                }
+                return translations;
             }
             return new List<TranslationBulk>();
         }
