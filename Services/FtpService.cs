@@ -24,12 +24,18 @@ namespace JsonTranslator.Services
             string server = ftpt.Server;
             string path = Path.Combine(folder, defaultLanguage + ".json");
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
+            try
+            {
+                await client.AutoConnectAsync();
 
-            await client.AutoConnectAsync();
-
-            if (await client.FileExistsAsync(path))
-                return true;
-            return false;
+                if (await client.FileExistsAsync(path))
+                    return true;
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public async Task<bool> CheckIfOldExists(FTP ftpt, string folder)
@@ -38,10 +44,18 @@ namespace JsonTranslator.Services
             string path = Path.Combine(folder, "old.json");
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
 
-            await client.AutoConnectAsync();
-            if (await client.FileExistsAsync(path))
-                return true;
-            return false;
+            try
+            {
+                await client.AutoConnectAsync();
+
+                if (await client.FileExistsAsync(path))
+                    return true;
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public async Task<bool> CheckIfFileExists(FTP ftpt, string folder, string languageId)
@@ -50,10 +64,18 @@ namespace JsonTranslator.Services
             string path = Path.Combine(folder, "languageId"+".json");
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
 
-            await client.AutoConnectAsync();
-            if (await client.FileExistsAsync(path))
-                return true;
-            return false;
+            try
+            {
+                await client.AutoConnectAsync();
+
+                if (await client.FileExistsAsync(path))
+                    return true;
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public async Task<Dictionary<string, string>> GetLanguage(FTP ftpt, string folder, string languageCode)
@@ -70,6 +92,7 @@ namespace JsonTranslator.Services
             }
 
             string path2 = Path.Combine(folder, languageCode+".json");
+
             await client.ConnectAsync();
             await client.DownloadFileAsync(path, path2, FtpLocalExists.Overwrite, FtpVerify.Retry);
 

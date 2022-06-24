@@ -17,6 +17,7 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IFtpService, FtpService>();
         services.AddSingleton<IApiService, ApiService>();
+        services.AddTransient<ISourcesService, SourcesService>();
     })
     .Build();
 

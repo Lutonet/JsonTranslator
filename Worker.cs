@@ -12,66 +12,35 @@ namespace JsonTranslator
         private readonly IApiService _api;
         private readonly IFileService _file;
         private readonly IFtpService _ftp;
+        private readonly ISourcesService _sources;
         public ServiceSettings settings;
         private List<HttpClient> clients;
         private List<Language> allLanguages;
-        private List<Language> languagesForTranslation;
+        private List<Language> languagesForTranslation = new List<Language>();
         private List<String> folders;
         private List<FTP> ftps;
         private string defaultLanguage;
         private List<Task> backends;
 
-        public Worker(ILogger<Worker> logger, IConfiguration configuration, IApiService api, IFileService file, IFtpService ftp)
+        public Worker(ILogger<Worker> logger, IConfiguration configuration, IApiService api, IFileService file, IFtpService ftp, ISourcesService sources)
         {
             _logger = logger;
             _configuration=configuration;
             _api=api;
             _file=file;
             _ftp=ftp;
+            _sources=sources;
+            settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
+            defaultLanguage = settings.DefaultLanguage;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                List<Translation> toAdd = new List<Translation>();
-                List<Translation> toRemove = new List<Translation>();
-                Dictionary<string, string> toUpdate = new Dictionary<string, string>();
-                Dictionary<string, string> defaultDictionary = new Dictionary<string, string>();
-                Dictionary<string, string> oldDefault = new Dictionary<string, string>();
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                // Check folders
-                while (folders == null && !stoppingToken.IsCancellationRequested)
-                {
-                    foreach (string folder in settings.Folders)
-                    {
-                        bool check = await _file.CheckIfDefaultExists(folder, defaultLanguage);
-                        if (check)
-                        {
-                            if (folders == null) folders = new List<string>();
-                            folders.Add(folder);
-                        }
-                    }
-                    _logger.LogInformation($"Added {folders.Count} folders");
-                    Task.Delay(200).Wait();
-                }
-                // Check FTP
-                if (settings.FTPs.Any())
-                    foreach (FTP ftp in settings.FTPs)
-                    {
-                        for (int i = 0; i < ftp.Folder.Count; i++)
-                            if (await _ftp.CheckIfDefaultExists(ftp, ftp.Folder[i], defaultLanguage))
-                                ftps.Add(ftp);
-                    }
-                _logger.LogInformation($"Added {ftps.Count} FTP folders");
-                Task.Delay(200).Wait();
-                // We have list of Folders - let check for changes one by one
-                // directly add them to the to translate lists
-                foreach (string folder in folders)
-                {
-                }
-                // Go through folders
-
+                TranslationWorkload workload = await (_sources.GetWorkload());
+                //TODO we got workload now address api part
+                _logger.LogInformation($"Found {workload.ToAdd.Count} phrases to add and {workload.ToRemove} phrases to remove");
                 await Task.Delay(10000, stoppingToken);
             }
         }

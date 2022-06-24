@@ -8,7 +8,7 @@ using static System.Net.WebRequestMethods;
 
 namespace JsonTranslator.Services
 {
-    public class SourcesService
+    public class SourcesService : ISourcesService
     {
         private IConfiguration _configuration;
         private ILogger<SourcesService> _logger;
@@ -19,6 +19,7 @@ namespace JsonTranslator.Services
         private List<Language> allLanguages = new List<Language>();
         private List<Language> languagesToTranslate = new List<Language>();
         private string defaultLanguage;
+        private List<Source> availableSources = new List<Source>();
 
         public SourcesService(IConfiguration configuration,
                               ILogger<SourcesService> logger,
@@ -33,6 +34,14 @@ namespace JsonTranslator.Services
             _api=api;
             settings= _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
             defaultLanguage = settings.DefaultLanguage;
+            Init();
+        }
+
+        public async Task Init()
+        {
+            // load storages
+            availableSources.Clear();
+            availableSources = await LoadSources();
         }
 
         private async Task<List<Source>> LoadSources()
@@ -41,7 +50,6 @@ namespace JsonTranslator.Services
             string[] sourceFolders = settings.Folders;
             FTP[] fTPs = settings.FTPs;
             allLanguages = await _api.GetLanguages();
-            List<Source> availableSources = new List<Source>();
 
             // Check Folders
             if (sourceFolders.Length != 0)
@@ -118,11 +126,97 @@ namespace JsonTranslator.Services
 
         public async Task<TranslationWorkload> GetWorkload()
         {
-            List<Source> sources = await LoadSources();
-            foreach (Source source in sources)
+            List<Translation> toAdd = new List<Translation>();
+            List<Translation> toRemove = new List<Translation>();
+            foreach (Source source in availableSources)
             {
+                Dictionary<string, string> toUpdate = new Dictionary<string, string>();
+                List<TranslationBulk> translationsInSource = await GetNeededTranslations(source);
+                Dictionary<string, string> defaultTranslation = translationsInSource
+                    .Where(s => s.LanguageId == defaultLanguage)
+                    .Select(s => s.Dictionary).FirstOrDefault();
+                Dictionary<string, string> old = translationsInSource
+                    .Where(s => s.LanguageId == "old")
+                    .Select(s => s.Dictionary).FirstOrDefault();
+                List<Language> lngs = new List<Language>();
+                lngs.AddRange(languagesToTranslate);
+                lngs.Remove(lngs.Where(s => s.Code == defaultLanguage).FirstOrDefault());
+                // check changes between old and new file
+                if (defaultTranslation != null && old != null && old.Count > 0)
+                {
+                    foreach (var line in defaultTranslation)
+                    {
+                        if (old.ContainsKey(line.Key))
+                            if (old[line.Value] != defaultTranslation[line.Value])
+                                toUpdate.Add(line.Key, line.Value);
+                    }
+                }
+
+                // now check for changes in all other languages
+                foreach (var language in lngs)
+                {
+                    TranslationBulk actualTranslation = translationsInSource.Where(s => s.LanguageId == language.Code).FirstOrDefault();
+                    Dictionary<string, string> actualDictionary = actualTranslation.Dictionary;
+
+                    // check what needs to be added
+                    foreach (var line in defaultTranslation)
+                    {
+                        if (!actualDictionary.ContainsKey(line.Key))
+                            toAdd.Add(new Translation()
+                            {
+                                Language = language.Code,
+                                Phrase = line.Key,
+                                Text = line.Value,
+                                Source = source
+                            });
+                    }
+
+                    // check what needs to be updated
+                    if (toUpdate.Count > 0)
+                    {
+                        foreach (var update in toUpdate)
+                        {
+                            toAdd.Add(new Translation()
+                            {
+                                Language = language.Code,
+                                Phrase= update.Key,
+                                Text= update.Value,
+                                Source= source
+                            });
+                        }
+                    }
+
+                    // check what needs to be removed
+                    foreach (var line in actualDictionary)
+                    {
+                        if (!defaultTranslation.ContainsKey(line.Key))
+                            toRemove.Add(new Translation()
+                            {
+                                Language = language.Code,
+                                Phrase = line.Key,
+                                Text = line.Value,
+                                Source = source
+                            });
+                    }
+                }
             }
-            return new TranslationWorkload();
+
+            return new TranslationWorkload() { ToAdd = toAdd, ToRemove = toRemove };
+        }
+
+        public async Task StoreResults(List<TranslationBulk> toStore)
+        {
+            foreach (TranslationBulk toStoreItem in toStore)
+            {
+                if (toStoreItem.Source.SourceType == Sources.Folder)
+                {
+                    await (_file.StoreLanguage(toStoreItem.Source.File, toStoreItem.LanguageId, toStoreItem.Dictionary));
+                }
+                if (toStoreItem.Source.SourceType == Sources.Ftp)
+                {
+                    await (_ftp.StoreLanguage(toStoreItem.Source.FtpSettings, toStoreItem.Source.FTPFolder, toStoreItem.LanguageId, toStoreItem.Dictionary));
+                }
+            }
         }
     }
 }

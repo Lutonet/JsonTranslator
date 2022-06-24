@@ -34,7 +34,7 @@ namespace JsonTranslator.Services
 
         public async Task<bool> CheckIfFileExists(string folder, string languageId)
         {
-            string path = Path.Combine(folder, "languageId"+".json");
+            string path = Path.Combine(folder,languageId+".json");
             if (File.Exists(path))
                 return await Task.FromResult(true);
             return await Task.FromResult(false);
