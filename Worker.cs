@@ -14,13 +14,8 @@ namespace JsonTranslator
         private readonly IFtpService _ftp;
         private readonly ISourcesService _sources;
         public ServiceSettings settings;
-        private List<HttpClient> clients;
-        private List<Language> allLanguages;
         private List<Language> languagesForTranslation = new List<Language>();
-        private List<String> folders;
-        private List<FTP> ftps;
         private string defaultLanguage;
-        private List<Task> backends;
 
         public Worker(ILogger<Worker> logger, IConfiguration configuration, IApiService api, IFileService file, IFtpService ftp, ISourcesService sources)
         {
@@ -36,36 +31,105 @@ namespace JsonTranslator
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            int counter = 0;
             while (!stoppingToken.IsCancellationRequested)
             {
+                DateTime processStart = DateTime.Now;
+
+                while (!stoppingToken.IsCancellationRequested && settings == null || settings.DefaultLanguage == null)
+                {
+                    _logger.LogWarning("Settings not found, waiting 1s to retry");
+                    settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
+                    Task.Delay(500, stoppingToken).Wait();
+                }
+                _logger.LogInformation("Settings loaded");
+
+                while (!await _api.TestServer() && !stoppingToken.IsCancellationRequested)
+                {
+                    Task.Delay(5000).Wait();
+                    _logger.LogWarning("Waiting for APIs, No server available");
+                }
+                DateTime startLoadingFiles = DateTime.Now;
+                // get original data
+                _logger.LogInformation("Checking for the changes needed");
+                List<TranslationBulk> allTranslations = await _sources.GetAllNeededTranslations();
+                // get translators workload
                 TranslationWorkload workload = await (_sources.GetWorkload());
-                //TODO we got workload now address api part
-                _logger.LogInformation($"Found {workload.ToAdd.Count} phrases to add and {workload.ToRemove} phrases to remove");
-                await Task.Delay(10000, stoppingToken);
+                DateTime finishedExaminingChanges = DateTime.Now;
+                int folders = workload.ToAdd.Where(s => s.Source.SourceType == Sources.Folder).ToList().Count;
+                int ftpcount = workload.ToAdd.Where(s => s.Source.SourceType == Sources.Ftp).ToList().Count;
+                _logger.LogInformation($"Source files loaded in {finishedExaminingChanges.Subtract(startLoadingFiles).TotalSeconds} s.");
+                _logger.LogInformation($"Found {workload.ToAdd.Count} phrases to translate and {workload.ToRemove.Count} phrases to remove");
+
+                // long lasting task
+                DateTime translationsStart = DateTime.Now;
+                List<TranslationBulk> result = await (_api.Translate(workload.ToAdd, stoppingToken));
+                DateTime translationsStop = DateTime.Now;
+                int totalseconds = (int)translationsStop.Subtract(translationsStart).TotalSeconds;
+                int mins = totalseconds / 60;
+                int seconds = totalseconds % 60;
+                if (totalseconds == 0) totalseconds = 1;
+                _logger.LogInformation($"Received {workload.ToAdd.Count} translations in {mins}:{seconds}");
+                _logger.LogInformation($"Translated Speed is {workload.ToAdd.Count / totalseconds} phrases per second");
+
+                // we have all translations, now we need to add them to original source files
+                _logger.LogInformation("Storing changed and created translation files");
+                DateTime startStoring = DateTime.Now;
+                foreach (var translation in result)
+                {
+                    var actualItem = allTranslations.Where(s => s.Source == translation.Source && s.LanguageId == translation.LanguageId).FirstOrDefault();
+                    if (translation.Dictionary != null)
+                    {
+                        foreach (var item in translation.Dictionary)
+                            try
+                            {
+                                actualItem.Dictionary.Add(item.Key, item.Value);
+                            }
+                            catch
+                            {
+                                actualItem.Dictionary[item.Key] = item.Value;
+                            }
+                    }
+                }
+                foreach (var translation in allTranslations)
+                {
+                    var toRemove = workload.ToRemove.Where(t => t.Source == translation.Source && t.Language == translation.LanguageId).ToList();
+
+                    foreach (var item in toRemove)
+                    {
+                        try
+                        {
+                            //remove
+                            translation.Dictionary.Remove(item.Phrase);
+                        }
+                        catch
+                        {
+                            _logger.LogError("Phrase was not removed");
+                            //do nothing
+                        }
+                    }
+                }
+                allTranslations
+                    .Where(s => s.LanguageId == "old")
+                    .FirstOrDefault().Dictionary
+                    = allTranslations
+                    .Where(s => s.LanguageId == defaultLanguage)
+                    .Select(s => s.Dictionary)
+                    .FirstOrDefault();
+
+                await _sources.StoreResults(allTranslations);
+                DateTime endStoring = DateTime.Now;
+                _logger.LogInformation($"All files stored in {endStoring.Subtract(startStoring).Milliseconds} ms");
+                _logger.LogInformation($"All work finished in {endStoring.Subtract(processStart).Minutes} min, {endStoring.Subtract(processStart).Seconds} sec");
+                counter++;
+                _logger.LogInformation($"Program run after restart: {counter}");
+                _logger.LogInformation($"Program will run other check in 10 minutes");
+                await Task.Delay(60000, stoppingToken);
             }
         }
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Loading program settings...");
-            // load Settings
-            while (!cancellationToken.IsCancellationRequested && settings == null || settings.DefaultLanguage == null)
-            {
-                _logger.LogWarning("Settings not found, waiting 1s to retry");
-                settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
-                Task.Delay(500, cancellationToken).Wait();
-            }
-            _logger.LogInformation("Settings loaded successfully");
-            allLanguages = await _api.GetLanguages();
-            foreach (Language language in allLanguages)
-            {
-                if (language.Code != defaultLanguage)
-                {
-                    if (!settings.IgnoreLanguages.Where(s => s == language.Code).Any())
-                        languagesForTranslation.Add(language);
-                }
-            }
-            _logger.LogInformation($"{languagesForTranslation.Count} to be checked");
             await base.StartAsync(cancellationToken);
         }
 

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Net.WebRequestMethods;
+using File = System.IO.File;
 
 namespace JsonTranslator.Services
 {
@@ -26,6 +27,7 @@ namespace JsonTranslator.Services
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
             try
             {
+                client.ValidateAnyCertificate = true;
                 await client.AutoConnectAsync();
 
                 if (await client.FileExistsAsync(path))
@@ -46,6 +48,7 @@ namespace JsonTranslator.Services
 
             try
             {
+                client.ValidateAnyCertificate = true;
                 await client.AutoConnectAsync();
 
                 if (await client.FileExistsAsync(path))
@@ -61,11 +64,12 @@ namespace JsonTranslator.Services
         public async Task<bool> CheckIfFileExists(FTP ftpt, string folder, string languageId)
         {
             string server = ftpt.Server;
-            string path = Path.Combine(folder, "languageId"+".json");
+            string path = Path.Combine(folder, languageId+".json");
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
 
             try
             {
+                client.ValidateAnyCertificate = true;
                 await client.AutoConnectAsync();
 
                 if (await client.FileExistsAsync(path))
@@ -92,7 +96,7 @@ namespace JsonTranslator.Services
             }
 
             string path2 = Path.Combine(folder, languageCode+".json");
-
+            client.ValidateAnyCertificate = true;
             await client.ConnectAsync();
             await client.DownloadFileAsync(path, path2, FtpLocalExists.Overwrite, FtpVerify.Retry);
 
@@ -105,15 +109,17 @@ namespace JsonTranslator.Services
         public async Task StoreLanguage(FTP ftpt, string folder, string LanguageCode, Dictionary<string, string> data)
         {
             string server = ftpt.Server;
+            string json = JsonConvert.SerializeObject(data);
             string temp = Path.GetTempPath();
+
             string name = LanguageCode+".tmp";
             string path = Path.Combine(temp, name);
-            string json = JsonConvert.SerializeObject(data);
             string path2 = Path.Combine(folder, LanguageCode+".json");
             using FtpClient client = new FtpClient(server, ftpt.Login, ftpt.Password);
             try
             {
                 await System.IO.File.WriteAllTextAsync(path, json);
+                client.ValidateAnyCertificate = true;
                 await client.ConnectAsync();
                 await client.UploadAsync(await System.IO.File.ReadAllBytesAsync(path), path2, FtpRemoteExists.Overwrite, true, null);
             }

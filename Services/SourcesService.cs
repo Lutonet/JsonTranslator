@@ -34,7 +34,7 @@ namespace JsonTranslator.Services
             _api=api;
             settings= _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
             defaultLanguage = settings.DefaultLanguage;
-            Init();
+            Init().Wait();
         }
 
         public async Task Init()
@@ -65,6 +65,7 @@ namespace JsonTranslator.Services
 
             // Check FTPs
             if (settings.FTPs.Any())
+            {
                 foreach (FTP ftp in settings.FTPs)
                 {
                     for (int i = 0; i < ftp.Folder.Count; i++)
@@ -76,7 +77,8 @@ namespace JsonTranslator.Services
                                 FTPFolder = ftp.Folder[i]
                             }); ;
                 }
-            _logger.LogInformation($"Added {availableSources.Where(s => s.SourceType == Sources.Ftp).Count()} FTP folders");
+                _logger.LogInformation($"Added {availableSources.Where(s => s.SourceType == Sources.Ftp).Count()} FTP folders");
+            }
             return availableSources;
         }
 
@@ -85,10 +87,18 @@ namespace JsonTranslator.Services
             List<TranslationBulk> translationBulks = new List<TranslationBulk>();
             List<Language> neededTranslations = new();
             neededTranslations.AddRange(allLanguages);
+            languagesToTranslate.Clear();
             foreach (string language in settings.IgnoreLanguages)
             {
                 neededTranslations.Remove(neededTranslations.Where(s => s.Code == language).FirstOrDefault());
             }
+
+            foreach (var line in neededTranslations)
+            {
+                languagesToTranslate.Add(allLanguages.Where(s => s.Code == line.Code).FirstOrDefault());
+            }
+            languagesToTranslate.Remove(languagesToTranslate.Where(s => s.Code == defaultLanguage).FirstOrDefault());
+
             neededTranslations.Add(new Language() { Code = "old" });
             foreach (Language language in neededTranslations)
             {
@@ -147,7 +157,7 @@ namespace JsonTranslator.Services
                     foreach (var line in defaultTranslation)
                     {
                         if (old.ContainsKey(line.Key))
-                            if (old[line.Value] != defaultTranslation[line.Value])
+                            if (old[line.Key] != defaultTranslation[line.Key])
                                 toUpdate.Add(line.Key, line.Value);
                     }
                 }
@@ -202,6 +212,17 @@ namespace JsonTranslator.Services
             }
 
             return new TranslationWorkload() { ToAdd = toAdd, ToRemove = toRemove };
+        }
+
+        public async Task<List<TranslationBulk>> GetAllNeededTranslations()
+        {
+            List<TranslationBulk> result = new();
+            foreach (var source in availableSources)
+            {
+                var tmp = await GetNeededTranslations(source);
+                result.AddRange(tmp);
+            }
+            return result;
         }
 
         public async Task StoreResults(List<TranslationBulk> toStore)

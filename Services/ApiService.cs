@@ -30,6 +30,7 @@ namespace JsonTranslator.Services
         {
             _configuration = configuration;
             _logger = logger;
+            Init();
         }
 
         public void Init()
@@ -49,23 +50,29 @@ namespace JsonTranslator.Services
         // most important class here
         public async Task<List<TranslationBulk>> Translate(List<Translation> phrases, CancellationToken token)
         {
-            Init();
             // copy phrases to the local list
             foreach (var phrase in phrases)
             {
                 workload.Add(phrase);
             }
             // create API instances and buffers
+
             for (int i = 0; i < servers.Count(); i++)
             {
-                buffers.Add(new BufferService(servers[i], 5));
+                buffers.Add(new BufferService(i, servers[i], 10, _configuration)); ;
             }
             int completedBuffers = 0;
-            int temp = 0;
-            foreach (BufferService buffer in buffers)
+            List<Task> bufferTask = new List<Task>();
+            foreach (BufferService buffer in buffers.ToList())
             {
-                Task bufferTask = new Task(async () => await buffer.Start());
+                bufferTask.Add(new Task(() => buffer.Start()));
             }
+            foreach (Task buf in bufferTask)
+            {
+                buf.Start();
+            }
+            _logger.LogInformation($"{buffers.Count()} buffers started");
+
             while (!Completed && !token.IsCancellationRequested)
             {
                 if (workload.Count > 0)
@@ -74,15 +81,18 @@ namespace JsonTranslator.Services
                     {
                         if (service.buffer.Count == 0)
                         {
-                            if (workload.Count > service.Size)
+                            if (workload.Count > 20)
                             {
                                 service.buffer.AddRange(workload.Take(service.Size));
                                 workload.RemoveRange(0, service.Size);
+                                _logger.LogInformation($"{workload.Count} phrases remains to be translated");
                             }
                             else
                             {
+                                if (service.IsError) break;
                                 service.buffer.Add(workload.FirstOrDefault());
                                 workload.Remove(workload.FirstOrDefault());
+                                _logger.LogInformation($"{workload.Count} phrases remains to be translated");
                             }
 
                             if (service.successfullTranslations.Any())
@@ -100,41 +110,80 @@ namespace JsonTranslator.Services
                 }
                 foreach (BufferService service in buffers)
                 {
+                    Task.Delay(20).Wait();
+                    if (service.IsError)
+                    {
+                        _logger.LogError($"Buffer {service.id} is in Error state!");
+                        if (service.buffer.Any())
+                        {
+                            workload.AddRange(service.buffer);
+                            service.buffer.Clear();
+                        }
+                    }
                     if (service.buffer.Count == 0 && !service.successfullTranslations.Any() && !service.unsuccessfullTranslations.Any())
                     {
-                        completedBuffers++;
                         service.Finished = true;
                         completedBuffers++;
                     }
+                    else
+                    {
+                        translated.AddRange(service.successfullTranslations);
+                        errors.AddRange(service.unsuccessfullTranslations);
+                        service.successfullTranslations.Clear();
+                        service.unsuccessfullTranslations.Clear();
+                    }
+                }
+                await Task.Delay(40);
+
+                if (buffers.Where(s => s.Finished == true).Count() == buffers.Count())
+                {
+                    Completed = true;
+                }
+                if (buffers.Where(s => s.Finished == true).Count() == buffers.Count() -1)
+                {
                 }
                 // create worker and add it to the list
             }
-            Task.WaitAll(bufferTasks.ToArray());
-            await Task.Delay(100);
-            Console.WriteLine($"{translated.Count} phrases translated");
+            bufferTask.Clear();
+            buffers.Clear();
             translated = translated.OrderBy(s => s.Language).ToList();
             string[] countries = translated.Select(s => s.Language).Distinct().ToArray();
+            List<Source> sources = translated.Select(s => s.Source).Distinct().ToList();
+            foreach (var source in sources)
+            {
+                List<List<Translation>> translationsInFolder = new List<List<Translation>>();
+                foreach (var country in countries)
+                {
+                    translationsInFolder.Add(translated.Where(s => s.Source == source && s.Language == country).ToList());
+                }
+            }
+
             List<TranslationBulk> translations = new();
+
             if (countries != null && countries.Length > 0)
             {
-                foreach (string country in countries)
+                foreach (var source in sources)
                 {
-                    List<Translation> localized = translated.Where(s => s.Language == country).ToList();
-                    if (localized == null || localized.Count == 0)
+                    foreach (string country in countries)
                     {
-                        translations.Add(new TranslationBulk() { LanguageId = country, Dictionary = new Dictionary<string, string>() });
-                    }
-                    else
-                    {
-                        TranslationBulk bulk = new TranslationBulk();
-                        bulk.LanguageId = country;
-                        Dictionary<string, string> result = new Dictionary<string, string>();
-                        foreach (Translation line in localized)
+                        List<Translation> localized = translated.Where(s => s.Language == country).Where(s => s.Source == source).ToList();
+                        if (localized == null || localized.Count == 0)
                         {
-                            result.Add(line.Phrase, line.Text);
+                            translations.Add(new TranslationBulk() { LanguageId = country, Source=source, Dictionary = new Dictionary<string, string>() });
                         }
-                        bulk.Dictionary = result;
-                        translations.Add(bulk);
+                        else
+                        {
+                            TranslationBulk bulk = new TranslationBulk();
+                            bulk.LanguageId = country;
+                            bulk.Source = source;
+                            Dictionary<string, string> result = new Dictionary<string, string>();
+                            foreach (Translation line in localized)
+                            {
+                                result.Add(line.Phrase, line.Text);
+                            }
+                            bulk.Dictionary = result;
+                            translations.Add(bulk);
+                        }
                     }
                 }
                 return translations;
@@ -145,38 +194,48 @@ namespace JsonTranslator.Services
         // worker should include buffer and be able to call "fill buffer from shared list - elements moved to the buffer from the list
         public async Task<List<Language>> GetLanguages()
         {
-            Init();
-
-            try
-            {
-                using HttpClient client = new HttpClient();
-                client.BaseAddress = new Uri(servers[0].Address);
-                var response = await client.GetFromJsonAsync<List<Language>>("/languages");
-                if (response != null)
-                    return response;
-            }
-            catch
-            {
+            bool isError = true;
+            int serversCount = servers.Length;
+            int actual = 0;
+            while (isError && actual < serversCount)
                 try
                 {
                     using HttpClient client = new HttpClient();
-                    client.BaseAddress = new Uri(servers[1].Address);
+                    client.BaseAddress = new Uri(servers[actual].Address); ;
                     var response = await client.GetFromJsonAsync<List<Language>>("/languages");
                     if (response != null)
+                    {
+                        isError = false;
                         return response;
+                    }
                 }
                 catch
                 {
-                    return new List<Language>();
+                    _logger.LogError($"Server {servers[actual].Address} is not available");
+                    actual++;
                 }
-            }
             return new List<Language>();
         }
 
-        public async Task<ServerTestResult> TestServer(HttpClient client)
+        public async Task<bool> TestServer()
         {
-            Init();
-            return new ServerTestResult();
+            // this checks general availability of ANY server (for bare functionality)
+            foreach (Servers server in servers)
+            {
+                try
+                {
+                    HttpClient client = new HttpClient();
+                    client.BaseAddress = new Uri(server.Address);
+                    var response = await client.GetFromJsonAsync<List<Language>>("/languages");
+                    if (response != null)
+                        return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return false;
         }
     }
 }

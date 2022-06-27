@@ -12,12 +12,14 @@ namespace JsonTranslator.Services
     public class BufferService
     {
         private IConfiguration _configuration;
+        private ServiceSettings _settings;
         private Servers server;
-        private ILogger<BufferService> _logger;
+        private ILogger<ApiService> _logger;
         private HttpClient client;
-        public bool IsError { get; set; } = false;
+        public bool IsError { get; set; } = true;
         public bool Finished { get; set; } = false;
         public int Size { get; set; } = 5;
+        public int id { get; set; }
 
         public List<Translation> buffer = new List<Translation>();
         public List<Translation> successfullTranslations { get; set; } = new List<Translation>();
@@ -25,16 +27,17 @@ namespace JsonTranslator.Services
         public List<Language> languagesToTranslate { get; set; }
         public string DefaultLanguage { get; set; }
 
-        public BufferService(Servers server, int Size = 5, IConfiguration configuration = null, ILogger<BufferService> logger = null)
+        public BufferService(int id, Servers server, int Size = 5, IConfiguration configuration = null, ILogger<ApiService> logger = null)
         {
             _configuration = configuration;
-            ServiceSettings settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
-            DefaultLanguage = settings.DefaultLanguage;
+            _settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
+            DefaultLanguage = _settings.DefaultLanguage;
             client = new HttpClient();
             client.BaseAddress = new Uri(server.Address);
             this.server = server;
             _logger = logger;
             this.Size = Size;
+            this.id = id;
         }
 
         public async Task Start()
@@ -46,8 +49,10 @@ namespace JsonTranslator.Services
                 {
                     if (!await IsServerAlive(server))
                     {
-                        Task.Delay(1000).Wait();
+                        Task.Delay(200).Wait();
                         _logger.LogWarning($"API server {server.Address} is not alive");
+                        unsuccessfullTranslations.AddRange(buffer);
+                        buffer.Clear();
                     }
                     else
                     {
@@ -58,59 +63,78 @@ namespace JsonTranslator.Services
                 // Cycle to check the buffer
                 while (buffer.Count == 0)
                 {
-                    Task.Delay(20).Wait();
+                    if (Finished)
+                        break;
+                    Task.Delay(100).Wait();
                 }
-
-                // buffer is not empty - let proceed
-                foreach (Translation line in buffer)
+                if (buffer.Count > 0)
                 {
-                    TranslationRequestModel request = new();
-                    request.q = line.Text;
-                    request.source = DefaultLanguage;
-                    request.target = line.Language;
-                    request.api_key = String.Empty;
-                    if (server.UseKey)
+                    // buffer is not empty - let proceed
+                    foreach (Translation line in buffer)
                     {
-                        request.api_key = server.Key;
-                    }
-                    ApiResult translationResult = await TranslatePhrase(request);
-                    if (translationResult.IsError)
-                    {
-                        unsuccessfullTranslations.Add(line);
-                        buffer.Remove(line);
-
-                        //TODO translate all phrases
-                    }
-                    else
-                    {
-                        Translation successful = new Translation();
-                        successful.Text = translationResult.Translation;
-                        if (successful.Text == line.Text)
+                        if (IsError)
                         {
-                            request.q = (request.q).ToLower();
-                            translationResult = await TranslatePhrase(request);
-                            if (!translationResult.IsError)
-                            {
-                                successfullTranslations.Add(new Translation()
-                                {
-                                    Phrase = line.Phrase,
-                                    Text = translationResult.Translation,
-                                    Language = line.Language
-                                });
-                            }
+                            unsuccessfullTranslations.Add(line);
+                            buffer.Remove(line);
                         }
-                        else
+                        if (line != null)
                         {
-                            successfullTranslations.Add(new Translation()
+                            TranslationRequestModel request = new();
+                            request.q = line.Text;
+                            request.source = DefaultLanguage;
+                            request.target = line.Language;
+                            request.api_key = String.Empty;
+                            if (server.UseKey)
                             {
-                                Phrase = line.Phrase,
-                                Text = translationResult.Translation,
-                                Language = line.Language
-                            });
+                                request.api_key = server.Key;
+                            }
+                            ApiResult translationResult = await TranslatePhrase(request);
+                            if (translationResult.IsError)
+                            {
+                                unsuccessfullTranslations.Add(line);
+                                IsError = true;
+                                //TODO translate all phrases
+                            }
+                            else
+                            {
+                                Translation successful = new Translation();
+                                successful.Text = translationResult.Translation;
+                                if (successful.Text == line.Text)
+                                {
+                                    request.q = (request.q).ToLower();
+                                    translationResult = await TranslatePhrase(request);
+                                    if (!translationResult.IsError)
+                                    {
+                                        successfullTranslations.Add(new Translation()
+                                        {
+                                            Phrase = line.Phrase,
+                                            Text = translationResult.Translation,
+                                            Language = line.Language,
+                                            Source = line.Source
+                                        });
+                                    }
+                                    else
+                                    {
+                                        unsuccessfullTranslations.Add(line);
+                                        IsError = true;
+                                    }
+                                }
+                                else
+                                {
+                                    successfullTranslations.Add(new Translation()
+                                    {
+                                        Phrase = line.Phrase,
+                                        Text = translationResult.Translation,
+                                        Language = line.Language,
+                                        Source = line.Source
+                                    });
+                                }
+                            }
                         }
                     }
                     // Buffer is empty let run another cycle
                 }
+                buffer.Clear();
             }
         }
 

@@ -8,7 +8,7 @@ namespace JsonTranslator.Models
 {
     public class TranslationRequestModel
     {
-        public string q { get; set; }
+        public string q { get; set; } = "";
         public string source { get; set; }
         public string target { get; set; }
         public string format { get; set; } = "text";
