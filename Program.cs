@@ -32,7 +32,7 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddHostedService<Worker>();
         services.AddTransient<IFileService, FileService>();
         services.AddTransient<IFtpService, FtpService>();
-        services.AddSingleton<IApiService, ApiService>();
+        services.AddTransient<IApiService, ApiService>();
         services.AddTransient<ISourcesService, SourcesService>();
     })
     .Build();

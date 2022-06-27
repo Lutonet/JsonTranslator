@@ -13,14 +13,11 @@ namespace JsonTranslator.Services
 {
     public class ApiService : IApiService
     {
+        public List<TranslationBulk> result = new List<TranslationBulk>();
         public IConfiguration _configuration;
         public ServiceSettings settings;
         public static Servers[] servers;
-        public static List<Translation> workload = new List<Translation>();
-        public static List<Translation> translated = new List<Translation>();
-        public static List<Translation> errors = new List<Translation>();
-        public List<TranslationBulk> result = new List<TranslationBulk>();
-        public static List<HttpClient> apiServers = new List<HttpClient>();
+        public List<HttpClient> apiServers = new List<HttpClient>();
         private ILogger<ApiService> _logger;
         public List<BufferService> buffers = new List<BufferService>();
         public bool Completed = false;
@@ -40,7 +37,7 @@ namespace JsonTranslator.Services
                 while (settings == null)
                 {
                     _logger.LogWarning("Settings not found, waiting 1s to retry");
-                    Task.Delay(1000).Wait();
+                    Task.Delay(200).Wait();
                     settings = _configuration.GetSection("ServiceSettings").Get<ServiceSettings>();
                 }
                 servers = settings.Servers;
@@ -50,6 +47,9 @@ namespace JsonTranslator.Services
         // most important class here
         public async Task<List<TranslationBulk>> Translate(List<Translation> phrases, CancellationToken token)
         {
+            List<Translation> workload = new List<Translation>();
+            List<Translation> translated = new List<Translation>();
+            List<Translation> errors = new List<Translation>();
             // copy phrases to the local list
             foreach (var phrase in phrases)
             {
@@ -73,6 +73,7 @@ namespace JsonTranslator.Services
             }
             _logger.LogInformation($"{buffers.Count()} buffers started");
 
+            
             while (!Completed && !token.IsCancellationRequested)
             {
                 if (workload.Count > 0)
@@ -186,8 +187,10 @@ namespace JsonTranslator.Services
                         }
                     }
                 }
+                Completed = false;
                 return translations;
             }
+            Completed = false;
             return new List<TranslationBulk>();
         }
 
