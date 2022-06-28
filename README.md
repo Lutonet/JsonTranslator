@@ -92,7 +92,7 @@ important section is:
 ```
 
 Application runs in infinite cycles and checks for changes each 10 minutes. Running application should not consume more than 40MB of the server's memory.
-** Application uses the Multi threading - and Libre translate servers are accessed in parallel.** it means more libretranslate servers you use, faster the translation should be.
+**Application uses the Multi threading - and Libre translate servers are accessed in parallel.** it means more libretranslate servers you use, faster the translation should be.
 Workload is distributed proportionally "on demand" to the number of servers, to minimize overal translation time. In testing environment 4 API servers generated performance of 20 translated phrases per second.
 
 
