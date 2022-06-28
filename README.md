@@ -36,38 +36,71 @@ Important configuration is stored in appsettings.json file - which **can be modi
 important section is: 
 
 `"ServiceSettings": {
+    
     "Servers": [
+        
       {
+          
         "Address": "http://10.0.0.4:5000",
+        
         "UseKey": false,
+        
         "Key": ""
+        
       },
+      
       {
+          
         "Address": "http://10.0.0.100:5000",
+        
         "UseKey": false,
+        
         "Key": ""
+        
       },
+      
       {
+          
         "Address": "http://10.0.0.3:5000",
+        
         "UseKey": false,
+        
         "Key": ""
       },
+      
       {
+          
         "Address": "http://10.0.0.6:5000",
+        
         "UseKey": false,
+        
         "Key": ""
+        
       }
+      
     ],
+    
     "Folders": [ "D:\\test", "D:\\test2" ],
+    
     "FTPs": [
+        
       {
+          
         "Server": "ftp://10.0.0.7",
+        
         "Folder": [ "test" ],
+        
         "Login": "test",
+        
         "Password": "test"
+        
       }
+      
     ],
+    
     "DefaultLanguage": "en",
+    
     "IgnoreLanguages": [ "cs" ]
+    
   }`
   
