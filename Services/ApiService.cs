@@ -87,7 +87,7 @@ namespace JsonTranslator.Services
                                 {
                                     service.buffer.AddRange(workload.Take(service.Size));
                                     workload.RemoveRange(0, service.Size);
-                                    _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                    _logger.LogInformation($"{workload.Count} phrases remain to be translated");
                                 }
                             }
                             else if (workload.Count <= 20 && workload.Count > 0)
@@ -96,7 +96,7 @@ namespace JsonTranslator.Services
                                 {
                                     service.buffer.Add(workload.FirstOrDefault());
                                     workload.Remove(workload.FirstOrDefault());
-                                    _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                    _logger.LogInformation($"{workload.Count} phrases remain to be translated");
                                 }
                             }
 

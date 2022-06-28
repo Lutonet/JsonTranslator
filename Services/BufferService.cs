@@ -93,7 +93,6 @@ namespace JsonTranslator.Services
                             {
                                 unsuccessfullTranslations.Add(line);
                                 IsError = true;
-                                //TODO translate all phrases
                             }
                             else
                             {
