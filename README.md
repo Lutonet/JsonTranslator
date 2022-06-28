@@ -90,4 +90,20 @@ important section is:
     "IgnoreLanguages": [ "cs" ]
   }
 ```
-  
+
+Application runs in infinite cycles and checks for changes each 10 minutes. Running application should not consume more than 40MB of the server's memory.
+** Application uses the Multi threading - and Libre translate servers are accessed in parallel.** it means more libretranslate servers you use, faster the translation should be.
+Workload is distributed proportionally "on demand" to the number of servers, to minimize overal translation time. In testing environment 4 API servers generated performance of 20 translated phrases per second.
+
+
+## Important sections in the JSON file
+
+`Servers` in this section is a list of LibreTranslate servers you wish to use for translation. They can be public or you can deploy your own with a docker  container.
+[Libre translate](https://github.com/LibreTranslate/LibreTranslate) is great and free to use. At least one server is required.
+
+`Folders` in this section is a list of folders you wish to monitor - those folders must be local and application must have access right to read/write in them. 
+
+`FTPs` in this section is a list of FTP servers you wish to monitor - on each can be monitored one or more of folders - those are defined in the `Folder` property in the
+FTPs section in the array. If you **don't want to use FTP** just leave the section as it is, but don't delete it.
+`DefaultLanguage` is also mandatory property and it is a code of the language you want to use as a default language. whose json file will be used as a base for all other languages.
+`IgnoreLanguages` here you can define languages you don't want to translate automatically. if you want to translate into all available languages just define an empty array `[]`
