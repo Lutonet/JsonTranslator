@@ -124,7 +124,7 @@ namespace JsonTranslator
                 counter++;
                 _logger.LogInformation($"Program run after restart: {counter}");
                 _logger.LogInformation($"Program will run other check in 10 minutes");
-                await Task.Delay(10000, stoppingToken);
+                await Task.Delay(600000, stoppingToken);
             }
         }
 
