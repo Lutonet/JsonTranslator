@@ -9,15 +9,14 @@ I hope you will find it helpful and useful.
 
 ### 1. Install from the source code
 ``` You need to have the [.NET6 SDK](https://dotnet.microsoft.com/en-us/download) installed. You can find it [here](https://dotnet.microsoft.com/en-us/download)
-``` Download the project source code to your local folder 
-``` cd to the folder 
-``` edit the appsettings.json file to set API servers and managed folders in the filesystem, or on the FTP servers. Also set the code of the defaul language ("en")
-``` in the same folder open the terminal application and run following set of commands: 
-``` dotnet restore 
-``` dotnet publish 
-``` Run the application 
-``` dotnet run 
-```
+Download the project source code to your local folder 
+cd to the folder 
+edit the appsettings.json file to set API servers and managed folders in the filesystem, or on the FTP servers. Also set the code of the defaul language ("en")
+in the same folder open the terminal application and run following set of commands: 
+dotnet restore 
+dotnet publish 
+Run the application 
+dotnet run ```
 
 ## What is Lutonet JsonTranslator?
 
