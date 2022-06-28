@@ -142,6 +142,7 @@ namespace JsonTranslator.Services
         {
             try
             {
+                Task.Delay(50).Wait();
                 var response = await client.GetFromJsonAsync<List<Language>>("/languages");
                 if (response == null) return false;
                 return true;

@@ -17,8 +17,8 @@ namespace JsonTranslator.Services
         public IConfiguration _configuration;
         public ServiceSettings settings;
         public static Servers[] servers;
-        public List<HttpClient> apiServers = new List<HttpClient>();
         private ILogger<ApiService> _logger;
+        public List<HttpClient> apiServers = new List<HttpClient>();
         public List<BufferService> buffers = new List<BufferService>();
         public bool Completed = false;
         public List<Task> bufferTasks;
@@ -73,7 +73,6 @@ namespace JsonTranslator.Services
             }
             _logger.LogInformation($"{buffers.Count()} buffers started");
 
-            
             while (!Completed && !token.IsCancellationRequested)
             {
                 if (workload.Count > 0)
@@ -84,16 +83,21 @@ namespace JsonTranslator.Services
                         {
                             if (workload.Count > 20)
                             {
-                                service.buffer.AddRange(workload.Take(service.Size));
-                                workload.RemoveRange(0, service.Size);
-                                _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                if (!service.IsError)
+                                {
+                                    service.buffer.AddRange(workload.Take(service.Size));
+                                    workload.RemoveRange(0, service.Size);
+                                    _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                }
                             }
-                            else
+                            else if (workload.Count <= 20 && workload.Count > 0)
                             {
-                                if (service.IsError) break;
-                                service.buffer.Add(workload.FirstOrDefault());
-                                workload.Remove(workload.FirstOrDefault());
-                                _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                if (!service.IsError)
+                                {
+                                    service.buffer.Add(workload.FirstOrDefault());
+                                    workload.Remove(workload.FirstOrDefault());
+                                    _logger.LogInformation($"{workload.Count} phrases remains to be translated");
+                                }
                             }
 
                             if (service.successfullTranslations.Any())
@@ -111,7 +115,6 @@ namespace JsonTranslator.Services
                 }
                 foreach (BufferService service in buffers)
                 {
-                    Task.Delay(20).Wait();
                     if (service.IsError)
                     {
                         _logger.LogError($"Buffer {service.id} is in Error state!");
@@ -134,15 +137,13 @@ namespace JsonTranslator.Services
                         service.unsuccessfullTranslations.Clear();
                     }
                 }
-                await Task.Delay(40);
+                await Task.Delay(20);
 
                 if (buffers.Where(s => s.Finished == true).Count() == buffers.Count())
                 {
                     Completed = true;
                 }
-                if (buffers.Where(s => s.Finished == true).Count() == buffers.Count() -1)
-                {
-                }
+
                 // create worker and add it to the list
             }
             bufferTask.Clear();
