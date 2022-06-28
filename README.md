@@ -5,6 +5,20 @@
 Thank you for your interest in this project. 
 I hope you will find it helpful and useful.
 
+## The Quick start
+
+### 1. Install from the source code
+``` You need to have the [.NET6 SDK](https://dotnet.microsoft.com/en-us/download) installed. You can find it [here](https://dotnet.microsoft.com/en-us/download)
+``` Download the project source code to your local folder 
+``` cd to the folder 
+``` edit the appsettings.json file to set API servers and managed folders in the filesystem, or on the FTP servers. Also set the code of the defaul language ("en")
+``` in the same folder open the terminal application and run following set of commands: 
+``` dotnet restore 
+``` dotnet publish 
+``` Run the application 
+``` dotnet run 
+```
+
 ## What is Lutonet JsonTranslator?
 
 **Json translator is an application which helps you to translate your pages or application to multiple version in json format.**
