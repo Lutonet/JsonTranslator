@@ -16,7 +16,8 @@ in the same folder open the terminal application and run following set of comman
 dotnet restore 
 dotnet publish 
 Run the application 
-dotnet run ```
+dotnet run 
+```
 
 ## What is Lutonet JsonTranslator?
 
@@ -32,16 +33,17 @@ phrase and a text. Phrase is a key which stays unchanged in different translatio
 
 for example en.json can look like this: 
 
-`{
+```{
     "greeting": "Hello",
     "message": "How are you?"
-}`
+}```
 
 and the same example for de.json would be 
-`{
+
+```{
     "greeting": "Hallo",
     "message": "Wie gehts dir?"
-}`
+}```
 
 Application is using different user defined (on premises or public) LibreTranslate API servers between which is work automatically distributed. 
 
