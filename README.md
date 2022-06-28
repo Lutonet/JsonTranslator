@@ -33,21 +33,61 @@ phrase and a text. Phrase is a key which stays unchanged in different translatio
 
 for example en.json can look like this: 
 
-```{
+```
+{
     "greeting": "Hello",
     "message": "How are you?"
-}```
+}
+```
 
 and the same example for de.json would be 
 
-```{
+```
+{
     "greeting": "Hallo",
     "message": "Wie gehts dir?"
-}```
+}
+```
 
 Application is using different user defined (on premises or public) LibreTranslate API servers between which is work automatically distributed. 
 
 Important configuration is stored in appsettings.json file - which **can be modified during execution of the service** and new settings should be used immediately
 important section is: 
-
+```
+"ServiceSettings": {
+    "Servers": [
+      {
+        "Address": "http://10.0.0.4:5000",
+        "UseKey": false,
+        "Key": ""
+      },
+      {
+        "Address": "http://10.0.0.100:5000",
+        "UseKey": false,
+        "Key": ""
+      },
+      {
+        "Address": "http://10.0.0.3:5000",
+        "UseKey": false,
+        "Key": ""
+      },
+      {
+        "Address": "http://10.0.0.6:5000",
+        "UseKey": false,
+        "Key": ""
+      }
+    ],
+    "Folders": [ "D:\\test", "D:\\test2" ],
+    "FTPs": [
+      {
+        "Server": "ftp://10.0.0.7",
+        "Folder": [ "test" ],
+        "Login": "test",
+        "Password": "test"
+      }
+    ],
+    "DefaultLanguage": "en",
+    "IgnoreLanguages": [ "cs" ]
+  }
+```
   
